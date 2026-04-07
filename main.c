@@ -2,8 +2,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define MAX 100
-
 // ---------------- STRUCTURES ----------------
 struct Date {
     int date; // integer from 1 to 31
@@ -17,9 +15,9 @@ struct Time {
 };
 
 struct Flight {
-    char flightNo;
-    char from[20];
-    char to[20];
+    int flightNo;
+    char from[50];
+    char to[50];
     struct Date date;
     struct Time start_time;
     struct Time end_time;
@@ -27,9 +25,9 @@ struct Flight {
 };
 
 struct Booking {
-    char username[20];
+    char username[100];
     char passenger[30];
-    char flightNo;
+    int flightNo;
     int amount;
 };
 
@@ -43,12 +41,22 @@ struct Booking {
 void display_date(struct Date d) {
     printf("%02d/%02d/%04d", d.date, d.month, d.year);
 }
+
 void display_time(struct Time t) {
     printf("%02d:%02d", t.hour, t.minute);
 }
 
-// ---------------- FUNCTION DECLARATIONS ----------------
+void display_flight(struct Flight f) {
+    printf("%d | %s -> %s | ", f.flightNo, f.from, f.to);
+    display_date(f.date);
+    printf(" | ");
+    display_time(f.start_time);
+    printf(" - ");
+    display_time(f.end_time);
+    printf(" | Rs.%d\n", f.price);
+}
 
+// ---------------- FUNCTION DECLARATIONS ----------------
 void registerUser();
 int loginUser(char username[]);
 void searchFlights();
@@ -57,13 +65,14 @@ int processPayment(int amount);
 void viewBookings(char username[]);
 void cancelBooking(char username[]);
 
+
+
 // ------------------------- MAIN FUNCTION ---------------------
 int main() {
     int choice;
-    char username[20];
-
+    char username[100];
     while (1) {
-        printf("\n==== FLIGHT BOOKING SYSTEM ====\n");
+        printf("\n==== GEU FLIGHT BOOKING SYSTEM ====\n");
         printf("1. Login\n");
         printf("2. Register\n");
         printf("3. Exit\n");
@@ -77,7 +86,7 @@ int main() {
 
                 int option;
                 while (1) {
-                    printf("\n----- MAIN MENU -----\n");
+                    printf("\n----- MAIN MENU -----\n%s\n", username);
                     printf("1. Search Flights\n");
                     printf("2. Book Flight\n");
                     printf("3. View My Bookings\n");
@@ -114,108 +123,78 @@ int main() {
     }
 }
 
-// ---------------- FUNCTIONS ----------------
-
-// REGISTER
-void registerUser() {
-    char user[100], pass[20], line[150];
-    FILE *fp = fopen("users.txt", "r");
-    int valid_username = 0;
-
-    while (!valid_username) {
-        int taken = 0;
-
-        printf("\nEnter Username: ");
-        readStr(user, sizeof(user));
-
-        if (strlen(user) < 3 || strlen(user) > 100) {
-            printf("Username must be between 3 and 100 characters!\n");
-            continue;
-        }
-        if (strchr(user, ',') != NULL) {
-            printf("Username cannot contain commas!\n");
-            continue;
-        }
-
-        if (fp != NULL) {
-            rewind(fp);
-            while (fgets(line, sizeof(line), fp) != NULL) {
-                line[strcspn(line, "\n")] = '\0';
-
-                char *existingUser = strtok(line, ",");
-                if (existingUser != NULL && strcmp(existingUser, user) == 0) {
-                    taken = 1;
-                    break;
-                }
-            }
-        }
-
-        if (taken) {
-            printf("Username already taken! Please choose another one.\n");
-            continue;
-        }
-
-        valid_username = 1;
+// Register a new user
+int CheckUserExist(char username[], FILE *fp) {
+    if (strchr(username, ' ') != NULL) {
+        printf("Username cannot contain spaces!\n");
+        return 1; // treat as existing to prevent registration
     }
+    char LINE[200], file_user[100], file_pass[100];
+    while (fscanf(fp, "%s %s", file_user, file_pass) != EOF) {
+        if (strcmp(file_user, username) == 0) {
+            printf("Username already exists! Please choose a different username.\n");
+            return 1; // user exists
+        }
+    }
+    return 0; // user does not exist
+}
 
-    if (fp != NULL) fclose(fp);
+int CheckValidPassword(char password[]) {
+    if (strlen(password) < 6) {
+        printf("Password must be at least 6 characters long!\n");
+        return 0;
+    }
+    if (strchr(password, ' ') != NULL) {
+        printf("Password cannot contain spaces!\n");
+        return 0;
+    }
+    return 1;
+}
 
-    fp = fopen("users.txt", "a");
-    if (fp == NULL) {
-        printf("Unable to open users.txt!\n");
+void registerUser() {
+    FILE *fp = fopen("users.txt", "a+");
+    char username[100], password[100];
+    printf("\nEnter Username: ");
+    readStr(username, sizeof(username));
+    if (CheckUserExist(username, fp)) {
+        fclose(fp);
         return;
     }
-
     printf("Enter Password: ");
-    readStr(pass, sizeof(pass));
-
-    // CSV format: username,password
-    fprintf(fp, "%s,%s\n", user, pass);
+    readStr(password, sizeof(password));
+    if (strchr(password, ',') != NULL) {
+        printf("Password cannot contain commas!\n");
+        return;
+    }
+    fprintf(fp, "%s %s\n", username, password);
     fclose(fp);
-
-    printf("Registration Successful!\n");
+    printf("Registration Successful! You can now login.\n");
 }
 
 // LOGIN
-int loginUser(char username[]) {
-    char user[20], pass[20];
-    char line[50];
+int loginUser(char username[]){
+    char user[100], pass[100];
     FILE *fp = fopen("users.txt", "r");
-
-    if (fp == NULL) {
-        printf("No users registered yet!\n");
-        return 0;
-    }
-
     printf("\nEnter Username: ");
     readStr(user, sizeof(user));
-
     printf("Enter Password: ");
     readStr(pass, sizeof(pass));
 
-    // Read CSV line by line: username,password
-    while (fgets(line, sizeof(line), fp) != NULL) {
-        line[strcspn(line, "\n")] = '\0'; // strip newline
-
-        char *u = strtok(line, ",");
-        char *p = strtok(NULL, ",");
-
-        if (u == NULL || p == NULL) continue; // skip malformed lines
-
-        if (strcmp(user, u) == 0 && strcmp(pass, p) == 0) {
-            strcpy(username, user);
+    char file_user[100], file_pass[100];
+    while (fscanf(fp, "%s %s", file_user, file_pass) != EOF) {
+        if (strcmp(file_user, user) == 0 && strcmp(file_pass, pass) == 0) {
             fclose(fp);
-            return 1;
+            strcpy(username, user);
+            return 1; // user exists
         }
     }
-
     fclose(fp);
     printf("Invalid Username or Password!\n");
     return 0;
 }
 
 static int readFlightRecord(FILE *fp, struct Flight *f) {
-    return fscanf(fp, "%d %19s %19s %d %d %d %d %d %d %d %d",
+    return fscanf(fp, "%d %s %s %d %d %d %d %d %d %d %d",
                   &f->flightNo,
                   f->from,
                   f->to,
@@ -294,13 +273,7 @@ void searchFlights() {
                         (usePrice != 'y' && usePrice != 'Y' ||
                          (f.price >= minPrice && f.price <= maxPrice))) {
             found = 1;
-            printf("%d | %s -> %s | ", f.flightNo, f.from, f.to);
-            display_date(f.date);
-            printf(" | ");
-            display_time(f.start_time);
-            printf(" - ");
-            display_time(f.end_time);
-            printf(" | Rs.%d\n", f.price);
+            display_flight(f);
         }
     }
 
@@ -312,72 +285,45 @@ void searchFlights() {
 
 // BOOK FLIGHT
 void bookFlight(char username[]) {
-    struct Flight f;
-    char flightNo[10], passenger[30];
+    char passenger[30];
     FILE *fp = fopen("flights.txt", "r");
     FILE *bp = fopen("bookings.txt", "a");
-
-    if (fp == NULL) {
-        printf("Unable to open flights.txt!\n");
-        if (bp != NULL) fclose(bp);
-        return;
-    }
-    if (bp == NULL) {
-        printf("Unable to open bookings.txt!\n");
-        fclose(fp);
-        return;
-    }
-
     printf("Let us know where is your dream destination:\n");
     searchFlights();
 
     printf("\nEnter Flight Number to Book: ");
-    readStr(flightNo, sizeof(flightNo));
-
-    int found = 0;
-    while (readFlightRecord(fp, &f)) {
-
-        char currentFlightNo[10];
-        sprintf(currentFlightNo, "%d", f.flightNo);
-
-        if (strcmp(currentFlightNo, flightNo) == 0) {
-            found = 1;
-
-            printf("Enter Passenger Name: ");
-            // fgets allows first + last name with a space
-            readStr(passenger, sizeof(passenger));
-
-            // ------- PAYMENT MODULE -------
-            printf("\nProceeding to payment for flight %d...\n", f.flightNo);
-            int paymentSuccess = processPayment(f.price);
-
-            if (!paymentSuccess) {
-                printf("Payment failed! Booking cancelled.\n");
-                break;
-            }
-            // ------- END PAYMENT -------
-
-            fprintf(bp, "%s %s %d %d\n", username, passenger, f.flightNo, f.price);
-            printf("Booking Confirmed! Amount Paid: Rs.%d\n", f.price);
+    int flightNo;
+    scanf("%d", &flightNo);
+    struct Flight f;
+    char confirm;
+    while (readFlightRecord(fp, &f)){
+        if (flightNo == f.flightNo) {
+            printf("Flight Selected:\n");
+            display_flight(f);
+            printf("Do you want to proceed with booking? (y/n): ");
+            scanf(" %c", &confirm);
             break;
         }
     }
 
-    if (!found)
-        printf("Invalid Flight Number!\n");
-
+    if (confirm == 'y' || confirm == 'Y') {
+        int paymentSuccess = processPayment(f.price);
+        if (!paymentSuccess) {
+            printf("Payment failed! Booking cancelled.\n");
+            fclose(fp);
+            fclose(bp);
+            return;
+        }
+        printf("Enter Passenger Name: ");
+        readStr(passenger, sizeof(passenger));
+        printf("USERNAME: %s\n", username);
+        fprintf(bp, "%s,%s,%d,%d\n", username, passenger, f.flightNo, f.price);
+        printf("Booking Confirmed! Amount Paid: Rs.%d\n", f.price);
+    } 
+    else printf("Booking cancelled by user.\n");
     fclose(fp);
     fclose(bp);
 }
-
-// ---------------- PAYMENT MODULE ----------------
-
-/*
-    Payment methods:
-        1 - Credit/Debit Card
-        2 - UPI
-        3 - Net Banking
-*/
 
 int processPayment(int amount) {
     int method;
@@ -461,31 +407,30 @@ int processPayment(int amount) {
 }
 
 // VIEW BOOKINGS
+
+static int readBooking(FILE *fp, struct Booking *b) {
+    return fscanf(fp, " %[^,],%[^,],%d,%d",
+                  b->username,
+                  b->passenger,
+                  &b->flightNo,
+                  &b->amount);
+}
+
 void viewBookings(char username[]) {
     struct Booking b;
     FILE *fp = fopen("bookings.txt", "r");
 
-    printf("\nYour Bookings:\n");
-
     if (fp == NULL) {
-        printf("No bookings found!\n");
+        printf("Unable to open bookings.txt!\n");
         return;
     }
 
-    int found = 0;
-    while (fscanf(fp, "%s %s %s %d",
-           b.username, b.passenger, b.flightNo, &b.amount) != EOF) {
-
+    printf("\nYour Bookings:\n");
+    while (readBooking(fp, &b) == 4) {
         if (strcmp(b.username, username) == 0) {
-            found = 1;
-            printf("Passenger: %s | Flight: %s | Amount: Rs.%d\n",
-                   b.passenger, b.flightNo, b.amount);
+            printf("Passenger: %s | Flight No: %d | Amount Paid: Rs.%d\n", b.passenger, b.flightNo, b.amount);
         }
     }
-
-    if (!found)
-        printf("No bookings found!\n");
-
     fclose(fp);
 }
 
@@ -497,13 +442,8 @@ void cancelBooking(char username[]) {
     int userCount = 0;
 
     FILE *fp = fopen("bookings.txt", "r");
-    if (fp == NULL) {
-        printf("No bookings found.\n");
-        return;
-    }
 
     printf("\nYour Bookings:\n");
-
     // Single loop: read + store + display together
     while (readBooking(fp, &b) == 4) {
         all[count] = b;                                  // store every record
