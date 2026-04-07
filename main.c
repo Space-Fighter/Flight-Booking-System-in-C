@@ -489,37 +489,78 @@ void viewBookings(char username[]) {
     fclose(fp);
 }
 
-// CANCEL BOOKING
 void cancelBooking(char username[]) {
     struct Booking b;
+    struct Booking all[100];
+    int count = 0;
+    int userBookings[100];
+    int userCount = 0;
+
     FILE *fp = fopen("bookings.txt", "r");
-    FILE *temp = fopen("temp.txt", "w");
-
-    char flightNo[10];
-    int found = 0;
-
-    printf("\nEnter Flight Number to Cancel: ");
-    readStr(flightNo, sizeof(flightNo));
-
-    while (fscanf(fp, "%s %s %s %d",
-           b.username, b.passenger, b.flightNo, &b.amount) != EOF) {
-
-        if (strcmp(b.username, username) == 0 && strcmp(b.flightNo, flightNo) == 0) {
-            found = 1;
-            continue;
-        }
-        fprintf(temp, "%s %s %s %d\n",
-                b.username, b.passenger, b.flightNo, b.amount);
+    if (fp == NULL) {
+        printf("No bookings found.\n");
+        return;
     }
 
+    printf("\nYour Bookings:\n");
+
+    // Single loop: read + store + display together
+    while (readBooking(fp, &b) == 4) {
+        all[count] = b;                                  // store every record
+
+        if (strcmp(b.username, username) == 0) {
+            userBookings[userCount] = count;             // map user choice -> real index
+            printf("%d. Passenger: %s | Flight No: %d | Amount Paid: Rs.%d\n",
+                   ++userCount, b.passenger, b.flightNo, b.amount);
+        }
+
+        count++;
+    }
     fclose(fp);
-    fclose(temp);
 
-    remove("bookings.txt");
-    rename("temp.txt", "bookings.txt");
+    if (userCount == 0) {
+        printf("No bookings found.\n");
+        return;
+    }
 
-    if (found)
-        printf("Booking Cancelled!\n");
-    else
-        printf("No such booking found!\n");
+    // Ask which to cancel
+    int choice;
+    printf("\nEnter booking number to cancel (0 to go back): ");
+    scanf("%d", &choice);
+
+    if (choice == 0) return;
+
+    if (choice < 1 || choice > userCount) {
+        printf("Invalid choice.\n");
+        return;
+    }
+
+    int cancelIndex = userBookings[choice - 1];
+
+    // Confirm
+    printf("Are you sure you want to cancel booking for %s on Flight %d? (1=Yes / 0=No): ",
+           all[cancelIndex].passenger, all[cancelIndex].flightNo);
+    int confirm;
+    scanf("%d", &confirm);
+    if (confirm != 1) {
+        printf("Cancellation aborted.\n");
+        return;
+    }
+
+    // Rewrite file skipping cancelled record
+    FILE *fw = fopen("bookings.txt", "w");
+    if (fw == NULL) {
+        printf("Error updating bookings!\n");
+        return;
+    }
+
+    for (int i = 0; i < count; i++) {
+        if (i == cancelIndex) continue;
+        fprintf(fw, "%s,%s,%d,%d\n",
+                all[i].username, all[i].passenger,
+                all[i].flightNo, all[i].amount);
+    }
+    fclose(fw);
+
+    printf("Booking cancelled successfully!\n");
 }
