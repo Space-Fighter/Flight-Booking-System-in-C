@@ -148,6 +148,10 @@ int CheckValidPassword(char password[]) {
         printf("Password cannot contain spaces!\n");
         return 0;
     }
+    if (strchr(password, ',') != NULL) {
+        printf("Password cannot contain commas!\n");
+        return 0;
+    }
     return 1;
 }
 
@@ -162,8 +166,9 @@ void registerUser() {
     }
     printf("Enter Password: ");
     readStr(password, sizeof(password));
-    if (strchr(password, ',') != NULL) {
-        printf("Password cannot contain commas!\n");
+
+    if (!CheckValidPassword(password)) {
+        fclose(fp);
         return;
     }
     fprintf(fp, "%s %s\n", username, password);
