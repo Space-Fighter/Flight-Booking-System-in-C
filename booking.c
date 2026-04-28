@@ -1,61 +1,136 @@
 #include "app.h"
 
-static int readBooking(FILE *fp, struct Booking *b) {
-    return fscanf(fp, " %[^,],%[^,],%d,%d",
-                  b->username, b->passenger,
-                  &b->flightNo, &b->amount);
-}
-
 void bookFlight(char username[]) {
     char passenger[30];
-    FILE *fp = fopen("flights.txt", "r");
     FILE *bp = fopen("bookings.txt", "a");
 
-    searchFlights();
+    struct Flight *flights = NULL;
+    int flightCount;
 
-    printf("\nEnter Flight Number: ");
+    if (bp == NULL) {
+        printf("Unable to open bookings.txt!\n");
+        return;
+    }
+
+    printf("Let us know where is your dream destination:\n");
+
+    flightCount = searchFlights(&flights);
+
+    if (flightCount == 0) {
+        printf("Returning to main menu.\n");
+        fclose(bp);
+        free(flights);
+        return;
+    }
+
+    printf("\nEnter Flight Number to Book: ");
     int flightNo;
     scanf("%d", &flightNo);
 
-    struct Flight f;
-    char confirm;
+    int selectedIndex = -1;
 
-    while (fscanf(fp, "%d", &f.flightNo) != EOF) {
-        if (flightNo == f.flightNo) {
-            printf("Confirm booking? (y/n): ");
-            scanf(" %c", &confirm);
+    for (int i = 0; i < flightCount; i++) {
+        if (flights[i].flightNo == flightNo) {
+            selectedIndex = i;
             break;
         }
     }
 
-    if (confirm == 'y' || confirm == 'Y') {
-        int paymentSuccess = processPayment(f.price);
+    if (selectedIndex == -1) {
+        printf("Invalid flight number.\n");
+        free(flights);
+        fclose(bp);
+        return;
+    }
 
-        if (!paymentSuccess) return;
+    struct Flight f = flights[selectedIndex];
+
+    printf("Flight Selected:\n");
+    display_flight(f);
+
+    char confirm;
+    printf("Do you want to proceed with booking? (y/n): ");
+    scanf(" %c", &confirm);
+
+    if (confirm == 'y' || confirm == 'Y') {
+        if (!processPayment(f.price)) {
+            printf("Payment failed!\n");
+            free(flights);
+            fclose(bp);
+            return;
+        }
 
         printf("Enter Passenger Name: ");
+        getchar();
         readStr(passenger, sizeof(passenger));
 
         fprintf(bp, "%s,%s,%d,%d\n", username, passenger, f.flightNo, f.price);
         printf("Booking Confirmed!\n");
     }
 
-    fclose(fp);
+    free(flights);
     fclose(bp);
+}
+
+// VIEW BOOKINGS
+static int readBooking(FILE *fp, struct Booking *b) {
+    return fscanf(fp, " %[^,],%[^,],%d,%d",
+                  b->username,
+                  b->passenger,
+                  &b->flightNo,
+                  &b->amount);
 }
 
 void viewBookings(char username[]) {
     struct Booking b;
     FILE *fp = fopen("bookings.txt", "r");
 
+    if (fp == NULL) {
+        printf("Unable to open bookings.txt!\n");
+        return;
+    }
+
+    printf("\nYour Bookings:\n");
+
     while (readBooking(fp, &b) == 4) {
         if (strcmp(b.username, username) == 0) {
-            printf("%s | Flight %d | Rs.%d\n", b.passenger, b.flightNo, b.amount);
+            printf("Passenger: %s | Flight No: %d | Amount Paid: Rs.%d\n",
+                   b.passenger, b.flightNo, b.amount);
         }
     }
+
     fclose(fp);
 }
 
 void cancelBooking(char username[]) {
-    printf("Cancel feature working...\n");
+    struct Booking b;
+    struct Booking all[100];
+    int count = 0;
+
+    FILE *fp = fopen("bookings.txt", "r");
+
+    if (!fp) {
+        printf("Unable to open bookings.txt!\n");
+        return;
+    }
+
+    while (readBooking(fp, &b) == 4) {
+        all[count++] = b;
+    }
+    fclose(fp);
+
+    FILE *fw = fopen("bookings.txt", "w");
+
+    for (int i = 0; i < count; i++) {
+        if (strcmp(all[i].username, username) != 0) {
+            fprintf(fw, "%s,%s,%d,%d\n",
+                    all[i].username,
+                    all[i].passenger,
+                    all[i].flightNo,
+                    all[i].amount);
+        }
+    }
+
+    fclose(fw);
+    printf("All your bookings cancelled.\n");
 }

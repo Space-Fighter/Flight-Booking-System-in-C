@@ -47,7 +47,7 @@ void display_flight(struct Flight f);
 void registerUser();
 int loginUser(char username[]);
 
-void searchFlights();
+int searchFlights(struct Flight **flights);
 void bookFlight(char username[]);
 int processPayment(int amount);
 

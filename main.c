@@ -24,7 +24,12 @@ int main() {
                     getchar();
 
                     switch (option) {
-                        case 1: searchFlights(); break;
+                        case 1: {
+                                    struct Flight *temp = NULL;
+                                     searchFlights(&temp);
+                                     free(temp);
+                                        break;
+                                    }
                         case 2: bookFlight(username); break;
                         case 3: viewBookings(username); break;
                         case 4: cancelBooking(username); break;
