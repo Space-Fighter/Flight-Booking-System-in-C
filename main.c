@@ -59,7 +59,7 @@ void display_flight(struct Flight f) {
 // ---------------- FUNCTION DECLARATIONS ----------------
 void registerUser();
 int loginUser(char username[]);
-void searchFlights();
+int searchFlights(struct Flight **flights);
 void bookFlight(char username[]);
 int processPayment(int amount);
 void viewBookings(char username[]);
@@ -97,7 +97,12 @@ int main() {
                     getchar(); // flush newline left by scanf
 
                     switch (option) {
-                        case 1: searchFlights(); break;
+                        case 1: {
+                            struct Flight *flights = NULL;
+                            searchFlights(&flights);
+                            free(flights);
+                            break;
+                        }
                         case 2: bookFlight(username); break;
                         case 3: viewBookings(username); break;
                         case 4: cancelBooking(username); break;
@@ -214,7 +219,7 @@ static int readFlightRecord(FILE *fp, struct Flight *f) {
 }
 
 // SEARCH FLIGHTS
-void searchFlights() {
+int searchFlights(struct Flight **flights){
     char from[20], to[20];
     struct Date travelDate;
     struct Time travelTime;
@@ -222,11 +227,15 @@ void searchFlights() {
     char useDate, useTime, usePrice;
     FILE *fp = fopen("flights.txt", "r");
     struct Flight f;
+    int found = 0;
+    int capacity = 0;
 
     if (fp == NULL) {
         printf("Unable to open flights.txt!\n");
-        return;
+        return 0;
     }
+
+    *flights = NULL;
 
     printf("\nEnter From: ");
     readStr(from, sizeof(from));
@@ -262,7 +271,6 @@ void searchFlights() {
     }
 
     printf("\nAvailable Flights:\n");
-    int found = 0;
 
     while (readFlightRecord(fp, &f)) {
 
@@ -277,7 +285,22 @@ void searchFlights() {
                             f.start_time.minute == travelTime.minute)) &&
                         (usePrice != 'y' && usePrice != 'Y' ||
                          (f.price >= minPrice && f.price <= maxPrice))) {
-            found = 1;
+            if (found == capacity) {
+                int newCapacity = (capacity == 0) ? 10 : capacity * 2;
+                struct Flight *temp = realloc(*flights, newCapacity * sizeof(struct Flight));
+                if (temp == NULL) {
+                    printf("Unable to allocate memory for matching flights!\n");
+                    free(*flights);
+                    *flights = NULL;
+                    fclose(fp);
+                    return 0;
+                }
+                *flights = temp;
+                capacity = newCapacity;
+            }
+
+            (*flights)[found] = f;
+            found++;
             display_flight(f);
         }
     }
@@ -286,36 +309,63 @@ void searchFlights() {
         printf("No flights found!\n");
 
     fclose(fp);
+    return found;
 }
 
 // BOOK FLIGHT
 void bookFlight(char username[]) {
     char passenger[30];
-    FILE *fp = fopen("flights.txt", "r");
     FILE *bp = fopen("bookings.txt", "a");
+    struct Flight *flights = NULL;
+    int flightCount;
+
+    if (bp == NULL) {
+        printf("Unable to open bookings.txt!\n");
+        return;
+    }
+
     printf("Let us know where is your dream destination:\n");
-    searchFlights();
+    flightCount = searchFlights(&flights);
+    if (flightCount == 0) {
+        printf("Returning to main menu.\n");
+        fclose(bp);
+        free(flights);
+        return;
+    }
 
     printf("\nEnter Flight Number to Book: ");
     int flightNo;
     scanf("%d", &flightNo);
+
+    int selectedIndex = -1;
     struct Flight f;
     char confirm;
-    while (readFlightRecord(fp, &f)){
-        if (flightNo == f.flightNo) {
-            printf("Flight Selected:\n");
-            display_flight(f);
-            printf("Do you want to proceed with booking? (y/n): ");
-            scanf(" %c", &confirm);
+
+    for (int i = 0; i < flightCount; i++) {
+        if (flights[i].flightNo == flightNo) {
+            selectedIndex = i;
             break;
         }
     }
+
+    if (selectedIndex == -1) {
+        printf("Flight number not from filter menu. Returning to main.\n");
+        free(flights);
+        fclose(bp);
+        return;
+    }
+
+    f = flights[selectedIndex];
+    printf("Flight Selected:\n");
+    display_flight(f);
+    printf("Do you want to proceed with booking? (y/n): ");
+    scanf(" %c", &confirm);
 
     if (confirm == 'y' || confirm == 'Y') {
         int paymentSuccess = processPayment(f.price);
         if (!paymentSuccess) {
             printf("Payment failed! Booking cancelled.\n");
-            fclose(fp);
+            free(flights);
             fclose(bp);
             return;
         }
@@ -324,9 +374,10 @@ void bookFlight(char username[]) {
         printf("USERNAME: %s\n", username);
         fprintf(bp, "%s,%s,%d,%d\n", username, passenger, f.flightNo, f.price);
         printf("Booking Confirmed! Amount Paid: Rs.%d\n", f.price);
-    } 
+    }
     else printf("Booking cancelled by user.\n");
-    fclose(fp);
+
+    free(flights);
     fclose(bp);
 }
 
