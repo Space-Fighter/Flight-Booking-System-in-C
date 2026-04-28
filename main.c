@@ -424,19 +424,45 @@ static int readBooking(FILE *fp, struct Booking *b) {
 void viewBookings(char username[]) {
     struct Booking b;
     FILE *fp = fopen("bookings.txt", "r");
+    FILE *flightFp = fopen("flights.txt", "r");
+    struct Flight f;
 
     if (fp == NULL) {
         printf("Unable to open bookings.txt!\n");
         return;
     }
 
+    if (flightFp == NULL) {
+        printf("Unable to open flights.txt!\n");
+        fclose(fp);
+        return;
+    }
+
     printf("\nYour Bookings:\n");
     while (readBooking(fp, &b) == 4) {
         if (strcmp(b.username, username) == 0) {
-            printf("Passenger: %s | Flight No: %d | Amount Paid: Rs.%d\n", b.passenger, b.flightNo, b.amount);
+            int found = 0;
+
+            printf("Passenger: %s | Amount Paid: Rs.%d\n", b.passenger, b.amount);
+            printf("Flight Details: ");
+
+            rewind(flightFp);
+            while (readFlightRecord(flightFp, &f)) {
+                if (f.flightNo == b.flightNo) {
+                    display_flight(f);
+                    found = 1;
+                    break;
+                }
+            }
+
+            if (!found) {
+                printf("Flight No: %d not found\n", b.flightNo);
+            }
+            printf("\n");
         }
     }
     fclose(fp);
+    fclose(flightFp);
 }
 
 void cancelBooking(char username[]) {
