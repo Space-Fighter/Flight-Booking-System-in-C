@@ -1,1 +1,1 @@
-TomHawk,Tom Hawk,108,3100
+TomHawk,Tom Hawk,110,2600
