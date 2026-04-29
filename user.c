@@ -1,5 +1,4 @@
 #include "app.h"
-
 // Register a new user
 int CheckUserExist(char username[], FILE *fp) {
     if (strchr(username, ' ') != NULL) {
